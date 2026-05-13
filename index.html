@@ -1098,7 +1098,30 @@ async function sincronizarConSupabase() {
         merged.set(m.id, m);
       }
     }
-    matches = Array.from(merged.values()).sort((a, b) => {
+
+    // Deduplicar por rival: si hay dos partidos con el mismo rival (ej: uno inicial sin goles y uno cargado con goles),
+    // quedarse solo con el que tiene goles cargados (o el más reciente si ninguno tiene goles)
+    const porRival = new Map();
+    for (const m of merged.values()) {
+      const rivalNorm = normalizarTexto(m.rival);
+      const existing = porRival.get(rivalNorm);
+      if (!existing) {
+        porRival.set(rivalNorm, m);
+      } else {
+        const mTieneGoles = m.scorers && m.scorers.length > 0;
+        const exTieneGoles = existing.scorers && existing.scorers.length > 0;
+        if (mTieneGoles && !exTieneGoles) {
+          // El nuevo tiene goles, el existente no: reemplazar
+          porRival.set(rivalNorm, m);
+        } else if (!mTieneGoles && !exTieneGoles) {
+          // Ninguno tiene goles: quedarse con el más reciente (id más grande)
+          if (m.id > existing.id) porRival.set(rivalNorm, m);
+        }
+        // Si el existente ya tiene goles, no reemplazar
+      }
+    }
+
+    matches = Array.from(porRival.values()).sort((a, b) => {
       if (a.date && b.date) return b.date.localeCompare(a.date);
       return 0;
     });
@@ -2060,10 +2083,13 @@ function handleCharts(s) {
 function renderTable() {
   const tbody = document.getElementById('matchesTbody');
   const badge = document.getElementById('matchBadge');
-  badge.textContent = `${matches.length} partido${matches.length !== 1 ? 's' : ''}`;
 
-  if (matches.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><i class="fas fa-clipboard"></i><p>No hay partidos cargados.</p></div></td></tr>`;
+  // Mostrar solo partidos con goles cargados
+  const matchesConGoles = matches.filter(m => m.scorers && m.scorers.length > 0);
+  badge.textContent = `${matchesConGoles.length} partido${matchesConGoles.length !== 1 ? 's' : ''}`;
+
+  if (matchesConGoles.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><i class="fas fa-clipboard"></i><p>No hay partidos con goles cargados.</p></div></td></tr>`;
     return;
   }
 
@@ -2073,7 +2099,7 @@ function renderTable() {
     derrota:  '<span class="badge badge-d"><i class="fas fa-times-circle"></i> Derrota</span>',
   };
 
-  tbody.innerHTML = matches.map((m, idx) => {
+  tbody.innerHTML = matchesConGoles.map((m, idx) => {
     const d = new Date(m.date + 'T00:00:00');
     const dateStr = d.toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
     const scorersTxt = (m.scorers || []).filter(x=>x.name).map(x=>`${x.name} (${x.goals})`).join(', ') || '--';
@@ -2083,7 +2109,7 @@ function renderTable() {
     const cardsTxt = (yc + rc === 0) ? '--' : (yc ? `<span class="card-tag card-y">${yc}</span>` : '') + (rc ? `<span class="card-tag card-r">${rc}</span>` : '');
 
     return `<tr>
-      <td style="color:var(--gray-400);font-size:12px">${matches.length - idx}</td>
+      <td style="color:var(--gray-400);font-size:12px">${matchesConGoles.length - idx}</td>
       <td style="white-space:nowrap">${dateStr}</td>
       <td><span style="display:inline-flex;align-items:center;gap:6px">${escudoHTML(m.rival, 20)} <strong>${escHtml(m.rival)}</strong></span></td>
       <td><span class="score">${m.goalsFor}<span class="score-sep"> - </span>${m.goalsAgainst}</span></td>
@@ -2165,11 +2191,18 @@ function renderAll() {
 /* ================================================================
    FORM LOCK
 ================================================================ */
-let formularioDesbloqueado = false;
+let formularioDesbloqueado = sessionStorage.getItem('macabi_form_unlocked') === '1';
+
+// Si ya estaba desbloqueado en esta sesion, ocultar el overlay de inmediato
+if (formularioDesbloqueado) {
+  const _ov = document.getElementById('formLockOverlay');
+  if (_ov) _ov.style.display = 'none';
+}
 
 function desbloquearFormulario() {
   mostrarModalCodigo(() => {
     formularioDesbloqueado = true;
+    sessionStorage.setItem('macabi_form_unlocked', '1');
     const overlay = document.getElementById('formLockOverlay');
     if (overlay) overlay.style.display = 'none';
     showToast('Formulario desbloqueado', 'ok');
