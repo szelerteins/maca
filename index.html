@@ -867,13 +867,13 @@ const LIDE_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutos
 const SUPABASE_URL  = 'https://fvgrdniliycqhmxnnzbo.supabase.co';
 const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2Z3JkbmlsaXljcWhteG5uemJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MDAxNjAsImV4cCI6MjA5NDI3NjE2MH0.ricaC8qOOjIyqACDUuVPvXEAlXb_1_-Hha-cowUKRzk';
 
-let supabase = null;
+let sbClient = null;
 let supabaseReady = false;
 
 function initSupabase() {
   try {
     if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
       supabaseReady = true;
       console.log('[Supabase] Conectado');
     }
@@ -909,7 +909,7 @@ function initSupabase() {
 async function supabaseLoadMatches() {
   if (!supabaseReady) return null;
   try {
-    const { data, error } = await supabase
+    const { data, error } = await sbClient
       .from('match_stats')
       .select('*')
       .order('created_at', { ascending: false });
@@ -948,7 +948,7 @@ async function supabaseSaveMatch(match) {
       assists: match.assists || [],
       updated_at: new Date().toISOString(),
     };
-    const { error } = await supabase
+    const { error } = await sbClient
       .from('match_stats')
       .upsert(row, { onConflict: 'id' });
     if (error) throw error;
@@ -962,7 +962,7 @@ async function supabaseSaveMatch(match) {
 async function supabaseDeleteMatch(id) {
   if (!supabaseReady) return false;
   try {
-    const { error } = await supabase
+    const { error } = await sbClient
       .from('match_stats')
       .delete()
       .eq('id', id);
