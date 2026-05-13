@@ -489,6 +489,60 @@
     .chart-empty i { font-size:36px; }
     .chart-empty p { font-size:13px; font-weight:500; color:var(--gray-400); }
 
+    /* SCORERS / ASSISTERS TABLES */
+    .scorers-assisters-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 16px; margin-bottom: 28px;
+    }
+    @media(max-width:660px){ .scorers-assisters-grid{ grid-template-columns:1fr; } }
+
+    .scorers-card {
+      background: var(--white); border-radius: var(--radius-lg);
+      box-shadow: var(--shadow); border: 1px solid rgba(0,0,0,.04); overflow: hidden;
+    }
+    .scorers-card-header {
+      padding: 14px 18px; border-bottom: 1px solid var(--gray-100);
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--font-heading); font-size: 13px; font-weight: 700;
+      color: var(--gray-700);
+    }
+    .scorers-card-header i { color: var(--accent); }
+    .scorers-list { padding: 8px 0; }
+    .scorers-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 18px; transition: background .14s;
+    }
+    .scorers-row:hover { background: var(--gray-50); }
+    .scorers-rank {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--gray-100); display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-heading); font-size: 11px; font-weight: 800;
+      color: var(--gray-400); flex-shrink: 0;
+    }
+    .scorers-rank.gold   { background: #FEF3C7; color: #B45309; }
+    .scorers-rank.silver { background: #F1F5F9; color: #64748B; }
+    .scorers-rank.bronze { background: #FEF9EE; color: #92400E; }
+    .scorers-name { flex: 1; font-size: 13px; font-weight: 600; color: var(--gray-700); }
+    .scorers-count {
+      font-family: var(--font-heading); font-size: 16px; font-weight: 800;
+      color: var(--primary); min-width: 28px; text-align: right;
+    }
+    .scorers-count-lbl {
+      font-size: 10px; color: var(--gray-400); font-weight: 600; min-width: 30px;
+    }
+    .scorers-bar-wrap {
+      flex: 1; height: 5px; background: var(--gray-100); border-radius: 3px; overflow: hidden;
+    }
+    .scorers-bar {
+      height: 100%; border-radius: 3px;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      transition: width .5s ease;
+    }
+    .scorers-empty {
+      padding: 30px; text-align: center; color: var(--gray-400); font-size: 13px; font-weight: 500;
+    }
+    .scorers-empty i { display: block; font-size: 28px; margin-bottom: 8px; color: var(--gray-300); }
+
     /* FORM */
     .form-card {
       background: var(--white); border-radius: var(--radius-lg);
@@ -686,9 +740,34 @@
 
   <!-- STATS CARDS -->
   <h2 class="section-title"><i class="fas fa-chart-line"></i> Estadisticas Generales</h2>
+  <p style="font-size:12px;color:var(--gray-400);margin-top:-12px;margin-bottom:14px;font-weight:500"><i class="fas fa-database" style="margin-right:4px;color:var(--accent)"></i>Datos extraidos de LIDE</p>
   <div class="stats-grid" id="statsGrid"></div>
 
-  <!-- TOP SCORER -->
+  <!-- FIXTURE -->
+  <h2 class="section-title"><i class="fas fa-calendar-alt"></i> Fixture del Torneo</h2>
+  <div class="fixture-grid" id="fixtureGrid"></div>
+
+  <!-- CHARTS -->
+  <h2 class="section-title"><i class="fas fa-chart-bar"></i> Analisis Visual</h2>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3><i class="fas fa-futbol"></i> Goles a Favor vs. Goles en Contra</h3>
+      <div id="goalsChartWrap" class="chart-wrap"><canvas id="goalsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3><i class="fas fa-chart-pie"></i> Distribucion de Resultados</h3>
+      <div id="resultsChartWrap" class="chart-wrap"><canvas id="resultsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3><i class="fas fa-medal"></i> Ranking de Goleadores</h3>
+      <div id="scorersChartWrap" class="chart-wrap"><canvas id="scorersChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- GOLES DEL TORNEO -->
+  <h2 class="section-title"><i class="fas fa-futbol"></i> Goles del Torneo</h2>
+
+  <!-- TOP SCORER BANNER -->
   <div class="top-scorer-section">
     <div class="top-scorer-card">
       <div class="ts-deco-1"></div><div class="ts-deco-2"></div>
@@ -715,26 +794,8 @@
     </div>
   </div>
 
-  <!-- FIXTURE -->
-  <h2 class="section-title"><i class="fas fa-calendar-alt"></i> Fixture del Torneo</h2>
-  <div class="fixture-grid" id="fixtureGrid"></div>
-
-  <!-- CHARTS -->
-  <h2 class="section-title"><i class="fas fa-chart-bar"></i> Analisis Visual</h2>
-  <div class="charts-grid">
-    <div class="chart-card">
-      <h3><i class="fas fa-futbol"></i> Goles a Favor vs. Goles en Contra</h3>
-      <div id="goalsChartWrap" class="chart-wrap"><canvas id="goalsChart"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <h3><i class="fas fa-chart-pie"></i> Distribucion de Resultados</h3>
-      <div id="resultsChartWrap" class="chart-wrap"><canvas id="resultsChart"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <h3><i class="fas fa-medal"></i> Ranking de Goleadores</h3>
-      <div id="scorersChartWrap" class="chart-wrap"><canvas id="scorersChart"></canvas></div>
-    </div>
-  </div>
+  <!-- TABLAS GOLEADORES / ASISTIDORES -->
+  <div class="scorers-assisters-grid" id="scorersAssistersGrid"></div>
 
   <!-- FORM -->
   <h2 class="section-title"><i class="fas fa-circle-plus"></i> Cargar Goleadores del Partido</h2>
@@ -1688,18 +1749,31 @@ const TARJETAS_LIDE = {
 
 function computeStats() {
   const s = {
-    played: matches.length, wins: 0, draws: 0, losses: 0,
+    played: 0, wins: 0, draws: 0, losses: 0,
     gf: 0, ga: 0, yellow: TARJETAS_LIDE.totalAmarillas, red: TARJETAS_LIDE.totalRojas,
     scorers: {}, assisters: {},
     tarjetasDetalle: TARJETAS_LIDE,
   };
 
+  for (const m of RESULTADOS_TORNEO) {
+    const normL = normalizarTexto(m.local);
+    const normV = normalizarTexto(m.visitante);
+    if (normL.includes('macabi')) {
+      s.played++;
+      s.gf += m.gl; s.ga += m.gv;
+      if (m.gl > m.gv) s.wins++;
+      else if (m.gl === m.gv) s.draws++;
+      else s.losses++;
+    } else if (normV.includes('macabi')) {
+      s.played++;
+      s.gf += m.gv; s.ga += m.gl;
+      if (m.gv > m.gl) s.wins++;
+      else if (m.gv === m.gl) s.draws++;
+      else s.losses++;
+    }
+  }
+
   matches.forEach(m => {
-    if (m.result === 'victoria') s.wins++;
-    else if (m.result === 'empate') s.draws++;
-    else s.losses++;
-    s.gf += +m.goalsFor     || 0;
-    s.ga += +m.goalsAgainst || 0;
     (m.scorers || []).forEach(x => { if (x.name) s.scorers[x.name] = (s.scorers[x.name] || 0) + (+x.goals || 0); });
     (m.assists || []).forEach(x => { if (x.name) s.assisters[x.name] = (s.assisters[x.name] || 0) + (+x.count || 0); });
   });
@@ -1871,12 +1945,58 @@ function escHtml(str) {
 }
 
 /* ================================================================
+   RENDER SCORERS / ASSISTERS GRID
+================================================================ */
+function renderScorersAssistersGrid(s) {
+  const wrap = document.getElementById('scorersAssistersGrid');
+  if (!wrap) return;
+
+  const maxGoals   = s.topScorers5.length > 0 ? s.topScorers5[0][1] : 1;
+  const allAssists = Object.entries(s.assisters).sort((a,b) => b[1]-a[1]).slice(0,6);
+  const maxAssists = allAssists.length > 0 ? allAssists[0][1] : 1;
+
+  function rankClass(i) {
+    if (i === 0) return 'gold';
+    if (i === 1) return 'silver';
+    if (i === 2) return 'bronze';
+    return '';
+  }
+
+  function buildRows(entries, valueKey, label, maxVal) {
+    if (entries.length === 0) {
+      return `<div class="scorers-empty"><i class="fas fa-clipboard"></i>Todavia no hay datos cargados</div>`;
+    }
+    return entries.map(([name, val], i) => {
+      const pct = Math.round((val / maxVal) * 100);
+      return `<div class="scorers-row">
+        <div class="scorers-rank ${rankClass(i)}">${i+1}</div>
+        <div class="scorers-name">${escHtml(name)}</div>
+        <div class="scorers-bar-wrap"><div class="scorers-bar" style="width:${pct}%"></div></div>
+        <div class="scorers-count">${val}</div>
+        <div class="scorers-count-lbl">${label}</div>
+      </div>`;
+    }).join('');
+  }
+
+  wrap.innerHTML = `
+    <div class="scorers-card">
+      <div class="scorers-card-header"><i class="fas fa-futbol"></i> Tabla de Goleadores</div>
+      <div class="scorers-list">${buildRows(s.topScorers5, 'goals', 'gol', maxGoals)}</div>
+    </div>
+    <div class="scorers-card">
+      <div class="scorers-card-header"><i class="fas fa-hands-helping"></i> Tabla de Asistidores</div>
+      <div class="scorers-list">${buildRows(allAssists, 'count', 'asist.', maxAssists)}</div>
+    </div>`;
+}
+
+/* ================================================================
    FULL RENDER
 ================================================================ */
 function renderAll() {
   const s = computeStats();
   renderCards(s);
   renderTopScorer(s);
+  renderScorersAssistersGrid(s);
   handleCharts(s);
   renderTable();
   renderFixture();
