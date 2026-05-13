@@ -11,6 +11,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <!-- Chart.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
   <style>
     :root {
@@ -852,7 +854,172 @@ const STORE_KEY = 'macabi_v2';
 const TABLA_KEY = 'macabi_tabla';
 const TABLA_DATE_KEY = 'macabi_tabla_date';
 const RIVAL_ULTIMOS_KEY = 'macabi_rival_ultimos';
+const LIDE_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutos
 
+/* ── SUPABASE CONFIG ─────────────────────────────────────────
+   Crear un proyecto en https://supabase.com y reemplazar estos valores.
+   Ver instrucciones de tabla SQL mas abajo en los comentarios.
+─────────────────────────────────────────────────────────── */
+// INSTRUCCIONES: Reemplaza estos valores con los de tu proyecto Supabase.
+// 1. Anda a https://supabase.com y crea un proyecto gratis.
+// 2. En Settings > API, copia la URL y la anon/public key.
+// 3. Pegalo aca abajo.
+const SUPABASE_URL  = 'TU_SUPABASE_URL_ACA';
+const SUPABASE_KEY  = 'TU_SUPABASE_ANON_KEY_ACA';
+
+let supabase = null;
+let supabaseReady = false;
+
+function initSupabase() {
+  try {
+    if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      supabaseReady = true;
+      console.log('[Supabase] Conectado');
+    }
+  } catch (e) {
+    console.warn('[Supabase] No disponible, usando localStorage:', e.message);
+  }
+}
+
+/*
+  SQL para crear la tabla en Supabase:
+
+  CREATE TABLE match_stats (
+    id TEXT PRIMARY KEY,
+    rival TEXT NOT NULL,
+    date TEXT NOT NULL,
+    result TEXT NOT NULL,
+    goals_for INTEGER DEFAULT 0,
+    goals_against INTEGER DEFAULT 0,
+    yellow_cards INTEGER DEFAULT 0,
+    red_cards INTEGER DEFAULT 0,
+    scorers JSONB DEFAULT '[]'::jsonb,
+    assists JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  ALTER TABLE match_stats ENABLE ROW LEVEL SECURITY;
+
+  CREATE POLICY "Allow all access" ON match_stats
+    FOR ALL USING (true) WITH CHECK (true);
+*/
+
+async function supabaseLoadMatches() {
+  if (!supabaseReady) return null;
+  try {
+    const { data, error } = await supabase
+      .from('match_stats')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map(row => ({
+      id: row.id,
+      rival: row.rival,
+      date: row.date,
+      result: row.result,
+      goalsFor: row.goals_for,
+      goalsAgainst: row.goals_against,
+      yellowCards: row.yellow_cards,
+      redCards: row.red_cards,
+      scorers: row.scorers || [],
+      assists: row.assists || [],
+    }));
+  } catch (e) {
+    console.warn('[Supabase] Error al cargar:', e.message);
+    return null;
+  }
+}
+
+async function supabaseSaveMatch(match) {
+  if (!supabaseReady) return false;
+  try {
+    const row = {
+      id: match.id,
+      rival: match.rival,
+      date: match.date,
+      result: match.result,
+      goals_for: match.goalsFor,
+      goals_against: match.goalsAgainst,
+      yellow_cards: match.yellowCards || 0,
+      red_cards: match.redCards || 0,
+      scorers: match.scorers || [],
+      assists: match.assists || [],
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase
+      .from('match_stats')
+      .upsert(row, { onConflict: 'id' });
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.warn('[Supabase] Error al guardar:', e.message);
+    return false;
+  }
+}
+
+async function supabaseDeleteMatch(id) {
+  if (!supabaseReady) return false;
+  try {
+    const { error } = await supabase
+      .from('match_stats')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.warn('[Supabase] Error al eliminar:', e.message);
+    return false;
+  }
+}
+
+async function migrarLocalStorageASupabase() {
+  if (!supabaseReady) return;
+  const local = loadData();
+  if (!local || local.length === 0) return;
+
+  const remote = await supabaseLoadMatches();
+  if (remote === null) return;
+
+  const remoteIds = new Set(remote.map(m => m.id));
+  let migrados = 0;
+
+  for (const m of local) {
+    if (!remoteIds.has(m.id)) {
+      const ok = await supabaseSaveMatch(m);
+      if (ok) migrados++;
+    }
+  }
+
+  if (migrados > 0) {
+    console.log(`[Supabase] ${migrados} partidos migrados desde localStorage`);
+  }
+}
+
+async function sincronizarConSupabase() {
+  if (!supabaseReady) return;
+  const remote = await supabaseLoadMatches();
+  if (remote === null) return;
+
+  if (remote.length > 0 || matches.length > 0) {
+    const merged = new Map();
+    for (const m of matches) merged.set(m.id, m);
+    for (const m of remote) {
+      const existing = merged.get(m.id);
+      if (!existing || (m.scorers && m.scorers.length > 0 && (!existing.scorers || existing.scorers.length === 0))) {
+        merged.set(m.id, m);
+      }
+    }
+    matches = Array.from(merged.values()).sort((a, b) => {
+      if (a.date && b.date) return b.date.localeCompare(a.date);
+      return 0;
+    });
+    saveData(matches);
+  }
+}
+
+/* ── LOCAL STORAGE ───────────────────────────────────────── */
 function loadData()  { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch { return []; } }
 function saveData(d) { localStorage.setItem(STORE_KEY, JSON.stringify(d)); }
 
@@ -978,7 +1145,7 @@ const MATCHES_INICIALES = [
   { id:'f01', rival:'Sportivo Avellaneda', date:'2025-04-05', result:'empate',   goalsFor:2, goalsAgainst:2, yellowCards:0, redCards:0, scorers:[], assists:[] },
 ];
 
-const DATA_VERSION = 'v4_lide_tarjetas';
+const DATA_VERSION = 'v5_supabase_autorefresh';
 let matches;
 if (localStorage.getItem('macabi_version') !== DATA_VERSION) {
   matches = MATCHES_INICIALES;
@@ -1809,6 +1976,10 @@ document.getElementById('matchForm').addEventListener('submit', function(e) {
 
   matches.unshift(match);
   saveData(matches);
+  supabaseSaveMatch(match).then(ok => {
+    if (ok) console.log('[Supabase] Partido guardado en la nube');
+    else console.warn('[Supabase] Guardado solo en localStorage');
+  });
   renderAll();
 
   this.reset();
@@ -1826,6 +1997,7 @@ function deleteMatch(id) {
   if (!confirm('Eliminar este partido?')) return;
   matches = matches.filter(m => m.id !== id);
   saveData(matches);
+  supabaseDeleteMatch(id);
   renderAll();
   showToast('Partido eliminado', 'inf');
 }
@@ -1854,10 +2026,45 @@ function todayStr() {
 }
 
 /* ================================================================
+   LIDE AUTO-REFRESH
+   Intenta actualizar desde la API de LIDE cada 5 minutos.
+   Si CORS bloquea, usa los datos hardcodeados como fallback.
+================================================================ */
+let lideRefreshTimer = null;
+
+async function autoRefreshLide() {
+  console.log('[LIDE] Auto-refresh iniciado:', new Date().toLocaleTimeString('es-AR'));
+  await actualizarTablaDesdeLide();
+}
+
+function iniciarAutoRefreshLide() {
+  if (lideRefreshTimer) clearInterval(lideRefreshTimer);
+  lideRefreshTimer = setInterval(autoRefreshLide, LIDE_REFRESH_INTERVAL);
+  console.log('[LIDE] Auto-refresh programado cada 5 minutos');
+}
+
+/* ================================================================
    INIT
 ================================================================ */
 renderAll();
-actualizarTablaDesdeLide();
+
+(async function initApp() {
+  initSupabase();
+
+  // Sync con Supabase
+  if (supabaseReady) {
+    await migrarLocalStorageASupabase();
+    await sincronizarConSupabase();
+    renderAll();
+    console.log('[Init] Datos sincronizados con Supabase');
+  }
+
+  // Intentar actualizar desde LIDE al abrir
+  await actualizarTablaDesdeLide();
+
+  // Auto-refresh cada 5 minutos
+  iniciarAutoRefreshLide();
+})();
 </script>
 
 </body>
