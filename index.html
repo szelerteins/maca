@@ -740,7 +740,20 @@
 
   <!-- STATS CARDS -->
   <h2 class="section-title"><i class="fas fa-chart-line"></i> Estadisticas Generales</h2>
-  <p style="font-size:12px;color:var(--gray-400);margin-top:-12px;margin-bottom:14px;font-weight:500"><i class="fas fa-database" style="margin-right:4px;color:var(--accent)"></i>Datos extraidos de LIDE</p>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:-12px;margin-bottom:14px;flex-wrap:wrap">
+    <p style="font-size:12px;color:var(--gray-400);font-weight:500;margin:0"><i class="fas fa-database" style="margin-right:4px;color:var(--accent)"></i>Datos extraidos de LIDE</p>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="lideUpdateInfo" style="font-size:11px;color:var(--gray-400)"><i class="fas fa-clock" style="margin-right:4px"></i>Cargando...</span>
+      <button type="button" onclick="actualizarTablaDesdeLideManual()" style="
+        padding:6px 14px;font-size:11px;font-weight:600;
+        border:1px solid var(--primary);background:var(--white);color:var(--primary);
+        border-radius:6px;cursor:pointer;transition:all .2s;
+        display:flex;align-items:center;gap:6px
+      " onmouseover="this.style.background='var(--primary);this.style.color=#fff'" onmouseout="this.style.background='var(--white)';this.style.color='var(--primary)'">
+        <i class="fas fa-sync-alt"></i> Actualizar ahora
+      </button>
+    </div>
+  </div>
   <div class="stats-grid" id="statsGrid"></div>
 
   <!-- FIXTURE -->
@@ -941,7 +954,8 @@ const STORE_KEY = 'macabi_v2';
 const TABLA_KEY = 'macabi_tabla';
 const TABLA_DATE_KEY = 'macabi_tabla_date';
 const RIVAL_ULTIMOS_KEY = 'macabi_rival_ultimos';
-const LIDE_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutos
+const LIDE_LAST_UPDATE_KEY = 'macabi_lide_last_update';
+const LIDE_REFRESH_INTERVAL = 24 * 60 * 60 * 1000; // 24 horas
 
 /* ── SUPABASE CONFIG ─────────────────────────────────────────
    Crear un proyecto en https://supabase.com y reemplazar estos valores.
@@ -1408,8 +1422,10 @@ function obtenerDatosRival(nombreRival) {
 ================================================================ */
 async function actualizarTablaDesdeLide() {
   const btn = document.getElementById('btnActualizar');
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Actualizando...';
-  btn.disabled = true;
+  if (btn) {
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Actualizando...';
+    btn.disabled = true;
+  }
 
   try {
     const resp = await fetch('https://www.lide.com.ar/#/torneos/primera', {
@@ -1453,17 +1469,25 @@ async function actualizarTablaDesdeLide() {
     tablaPosiciones = tabla;
     tablaLastUpdate = new Date().toLocaleString('es-AR');
     guardarEnLocalStorage();
+    saveLideLastUpdateTime();
+    updateLideTimestampDisplay();
     renderTablaTorneo();
     renderProximoPartido();
     showToast('Tabla actualizada desde LIDE', 'ok');
 
   } catch (err) {
-    showToast('No se pudo actualizar automaticamente la tabla desde LIDE. Usa la carga manual.', 'err');
+    showToast('No se pudo actualizar la tabla desde LIDE. Usa la carga manual.', 'err');
     console.warn('Error al obtener tabla de LIDE:', err.message);
   } finally {
-    btn.innerHTML = '<i class="fas fa-rotate"></i> Actualizar desde LIDE';
-    btn.disabled = false;
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-rotate"></i> Actualizar desde LIDE';
+      btn.disabled = false;
+    }
   }
+}
+
+async function actualizarTablaDesdeLideManual() {
+  await actualizarTablaDesdeLide();
 }
 
 /* ================================================================
@@ -1504,6 +1528,12 @@ function toggleTablaEditor() {
 }
 
 function mostrarModalCodigo(onSuccess) {
+  console.log('[Modal] Mostrando modal de codigo');
+
+  // Cerrar modal anterior si existe
+  const existing = document.getElementById('codigoOverlay');
+  if (existing) existing.remove();
+
   // Crear overlay
   const overlay = document.createElement('div');
   overlay.id = 'codigoOverlay';
@@ -1520,6 +1550,7 @@ function mostrarModalCodigo(onSuccess) {
       padding:36px 32px;width:100%;max-width:360px;
       box-shadow:var(--shadow-lg);text-align:center;
       margin:0 16px;
+      position:relative;z-index:10001;
     ">
       <div style="
         width:56px;height:56px;border-radius:16px;margin:0 auto 18px;
@@ -1535,6 +1566,7 @@ function mostrarModalCodigo(onSuccess) {
           color:var(--gray-900);background:var(--gray-50);outline:none;
           text-align:center;letter-spacing:3px;margin-bottom:6px;
           transition:border-color .18s,box-shadow .18s;
+          box-sizing:border-box;
         "
         onkeydown="if(event.key==='Enter') verificarCodigo()"
         onfocus="this.style.borderColor='var(--primary-light)';this.style.boxShadow='0 0 0 3px rgba(0,86,210,.1)'"
@@ -1542,13 +1574,13 @@ function mostrarModalCodigo(onSuccess) {
       />
       <div id="codigoError" style="font-size:12px;color:var(--defeat);min-height:18px;margin-bottom:14px"></div>
       <div style="display:flex;gap:10px">
-        <button onclick="cerrarModalCodigo()"
+        <button type="button" onclick="cerrarModalCodigo()"
           style="flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--gray-200);
           background:var(--white);font-family:var(--font-body);font-size:14px;font-weight:600;
           color:var(--gray-500);cursor:pointer">
           Cancelar
         </button>
-        <button onclick="verificarCodigo()"
+        <button type="button" onclick="verificarCodigo()"
           style="flex:1;padding:11px;border-radius:10px;border:none;
           background:linear-gradient(135deg,var(--primary),var(--primary-light));
           font-family:var(--font-body);font-size:14px;font-weight:700;
@@ -1559,31 +1591,53 @@ function mostrarModalCodigo(onSuccess) {
     </div>`;
 
   document.body.appendChild(overlay);
-  setTimeout(() => document.getElementById('codigoInput').focus(), 80);
+  console.log('[Modal] Modal creado y agregado al DOM');
 
   // Guardar callback para usarlo en verificarCodigo
   window._codigoCallback = onSuccess;
 
   // Cerrar al hacer click en el overlay (fuera del modal)
   overlay.addEventListener('click', e => { if (e.target === overlay) cerrarModalCodigo(); });
+
+  // Enfocar el input
+  setTimeout(() => {
+    const input = document.getElementById('codigoInput');
+    if (input) {
+      input.focus();
+      console.log('[Modal] Input enfocado');
+    }
+  }, 150);
 }
 
 function verificarCodigo() {
   const input = document.getElementById('codigoInput');
   const error = document.getElementById('codigoError');
-  if (!input) return;
+  if (!input) {
+    console.warn('[Code] Campo de input no encontrado');
+    return;
+  }
 
-  if (input.value === EDITOR_CODE) {
-    cerrarModalCodigo();
-    if (typeof window._codigoCallback === 'function') window._codigoCallback();
+  const codigoIngresado = input.value.trim();
+  console.log('[Code] Verificando codigo...');
+
+  if (codigoIngresado === EDITOR_CODE) {
+    console.log('[Code] Codigo correcto!');
+    if (typeof window._codigoCallback === 'function') {
+      const callback = window._codigoCallback;
+      cerrarModalCodigo();
+      setTimeout(() => callback(), 150);
+    } else {
+      cerrarModalCodigo();
+    }
   } else {
-    error.textContent = 'Codigo incorrecto. Intenta de nuevo.';
+    console.warn('[Code] Codigo incorrecto');
+    if (error) error.textContent = 'Codigo incorrecto. Intenta de nuevo.';
     input.value = '';
     input.style.borderColor = 'var(--defeat)';
     input.style.boxShadow = '0 0 0 3px rgba(220,38,38,.12)';
     input.focus();
     setTimeout(() => {
-      if (input) {
+      if (input && input.parentElement) {
         input.style.borderColor = 'var(--gray-200)';
         input.style.boxShadow = 'none';
       }
@@ -1592,8 +1646,12 @@ function verificarCodigo() {
 }
 
 function cerrarModalCodigo() {
+  console.log('[Modal] Cerrando modal');
   const overlay = document.getElementById('codigoOverlay');
-  if (overlay) overlay.remove();
+  if (overlay) {
+    overlay.style.animation = 'toastOut .2s ease forwards';
+    setTimeout(() => overlay.remove(), 200);
+  }
   window._codigoCallback = null;
 }
 
@@ -2193,20 +2251,38 @@ function renderAll() {
 ================================================================ */
 let formularioDesbloqueado = sessionStorage.getItem('macabi_form_unlocked') === '1';
 
+function unlockFormNow() {
+  formularioDesbloqueado = true;
+  sessionStorage.setItem('macabi_form_unlocked', '1');
+  const overlay = document.getElementById('formLockOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    overlay.style.opacity = '0';
+    overlay.style.pointerEvents = 'none';
+  }
+  showToast('Formulario desbloqueado correctamente', 'ok');
+  console.log('[Form] Formulario desbloqueado');
+}
+
 // Si ya estaba desbloqueado en esta sesion, ocultar el overlay de inmediato
 if (formularioDesbloqueado) {
-  const _ov = document.getElementById('formLockOverlay');
-  if (_ov) _ov.style.display = 'none';
+  setTimeout(() => {
+    const _ov = document.getElementById('formLockOverlay');
+    if (_ov) {
+      _ov.style.display = 'none';
+      _ov.style.opacity = '0';
+      _ov.style.pointerEvents = 'none';
+    }
+  }, 100);
 }
 
 function desbloquearFormulario() {
-  mostrarModalCodigo(() => {
-    formularioDesbloqueado = true;
-    sessionStorage.setItem('macabi_form_unlocked', '1');
-    const overlay = document.getElementById('formLockOverlay');
-    if (overlay) overlay.style.display = 'none';
-    showToast('Formulario desbloqueado', 'ok');
-  });
+  console.log('[Form] Boton de desbloqueo presionado');
+  if (formularioDesbloqueado) {
+    showToast('El formulario ya esta desbloqueado', 'inf');
+    return;
+  }
+  mostrarModalCodigo(unlockFormNow);
 }
 
 /* ================================================================
@@ -2355,27 +2431,74 @@ function todayStr() {
 }
 
 /* ================================================================
-   LIDE AUTO-REFRESH
-   Intenta actualizar desde la API de LIDE cada 5 minutos.
-   Si CORS bloquea, usa los datos hardcodeados como fallback.
+   LIDE AUTO-REFRESH (24 horas)
 ================================================================ */
 let lideRefreshTimer = null;
 
+function getLideLastUpdateTime() {
+  const stored = localStorage.getItem(LIDE_LAST_UPDATE_KEY);
+  return stored ? parseInt(stored) : null;
+}
+
+function saveLideLastUpdateTime() {
+  localStorage.setItem(LIDE_LAST_UPDATE_KEY, Date.now().toString());
+}
+
+function shouldRefreshLide() {
+  const lastUpdate = getLideLastUpdateTime();
+  if (!lastUpdate) return true; // Nunca se actualizo, hacer ahora
+  const timeSinceUpdate = Date.now() - lastUpdate;
+  return timeSinceUpdate >= LIDE_REFRESH_INTERVAL;
+}
+
 async function autoRefreshLide() {
-  console.log('[LIDE] Auto-refresh iniciado:', new Date().toLocaleTimeString('es-AR'));
+  if (shouldRefreshLide()) {
+    console.log('[LIDE] Auto-refresh ejecutado:', new Date().toLocaleTimeString('es-AR'));
+    await actualizarTablaDesdeLideWithTimestamp();
+  } else {
+    const lastUpdate = getLideLastUpdateTime();
+    const timeLeft = LIDE_REFRESH_INTERVAL - (Date.now() - lastUpdate);
+    const hoursLeft = Math.round(timeLeft / (60 * 60 * 1000));
+    console.log('[LIDE] Proxima actualizacion en:', hoursLeft, 'horas');
+  }
+}
+
+async function actualizarTablaDesdeLideWithTimestamp() {
   await actualizarTablaDesdeLide();
+  saveLideLastUpdateTime();
+  updateLideTimestampDisplay();
 }
 
 function iniciarAutoRefreshLide() {
+  // Verificar al iniciar y luego cada hora si debe actualizar
+  autoRefreshLide();
   if (lideRefreshTimer) clearInterval(lideRefreshTimer);
-  lideRefreshTimer = setInterval(autoRefreshLide, LIDE_REFRESH_INTERVAL);
-  console.log('[LIDE] Auto-refresh programado cada 5 minutos');
+  lideRefreshTimer = setInterval(autoRefreshLide, 60 * 60 * 1000); // Verificar cada hora
+  console.log('[LIDE] Auto-refresh configurado (verifica cada 24h)');
+}
+
+function updateLideTimestampDisplay() {
+  const lastUpdate = getLideLastUpdateTime();
+  const info = document.getElementById('lideUpdateInfo');
+  if (info && lastUpdate) {
+    const date = new Date(lastUpdate);
+    const formatted = date.toLocaleString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    info.innerHTML = `<i class="fas fa-clock" style="margin-right:6px"></i>Ultima actualizacion LIDE: ${formatted}`;
+  }
 }
 
 /* ================================================================
    INIT
 ================================================================ */
 renderAll();
+updateLideTimestampDisplay();
+iniciarAutoRefreshLide();
 
 (async function initApp() {
   initSupabase();
