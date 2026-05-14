@@ -1622,9 +1622,12 @@ function verificarCodigo() {
 
   if (codigoIngresado === EDITOR_CODE) {
     console.log('[Code] Codigo correcto!');
-    cerrarModalCodigo();
     if (typeof window._codigoCallback === 'function') {
-      setTimeout(() => window._codigoCallback(), 100);
+      const callback = window._codigoCallback;
+      cerrarModalCodigo();
+      setTimeout(() => callback(), 150);
+    } else {
+      cerrarModalCodigo();
     }
   } else {
     console.warn('[Code] Codigo incorrecto');
