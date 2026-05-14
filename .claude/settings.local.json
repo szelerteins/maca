@@ -8,7 +8,11 @@
       "mcp__Claude_in_Chrome__computer",
       "mcp__Claude_in_Chrome__read_console_messages",
       "mcp__Claude_in_Chrome__browser_batch",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'Arreglar: Cargar goleadores desbloqueado y LIDE con ciclo 24h' --body ' *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)"
     ]
   }
 }

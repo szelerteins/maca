@@ -1950,6 +1950,51 @@ function updateMatchInfo() {
     : '<span class="badge badge-d" style="margin-left:8px">Derrota</span>';
   info.innerHTML = `<strong>MACABI ${res.goalsFor} - ${res.goalsAgainst} ${escHtml(rival)}</strong> ${badge}`;
   info.style.color = 'var(--gray-900)';
+
+  // Cargar datos de un partido existente si lo hay
+  cargarPartidoExistente(rival);
+}
+
+function cargarPartidoExistente(rival) {
+  const partido = buscarPartidoPorRival(rival);
+  if (!partido) {
+    // Limpiar formulario si no hay partido existente
+    document.getElementById('scorersRows').innerHTML = emptyRowHTML('scorer');
+    document.getElementById('assistsRows').innerHTML = emptyRowHTML('assist');
+    return;
+  }
+
+  // Cargar goleadores
+  const scorersRows = document.getElementById('scorersRows');
+  if (partido.scorers && partido.scorers.length > 0) {
+    scorersRows.innerHTML = '';
+    partido.scorers.forEach(scorer => {
+      const div = document.createElement('div');
+      div.className = 'player-row';
+      div.innerHTML = `<input type="text" class="form-control sname" placeholder="Nombre del jugador" value="${escHtml(scorer.name)}" />
+        <input type="number" class="form-control num-input sgoals" min="0" value="${scorer.goals}" placeholder="Goles" />
+        <button type="button" class="btn-rm" onclick="rmRow(this)"><i class="fas fa-xmark"></i></button>`;
+      scorersRows.appendChild(div);
+    });
+  } else {
+    scorersRows.innerHTML = emptyRowHTML('scorer');
+  }
+
+  // Cargar asistencias
+  const assistsRows = document.getElementById('assistsRows');
+  if (partido.assists && partido.assists.length > 0) {
+    assistsRows.innerHTML = '';
+    partido.assists.forEach(assist => {
+      const div = document.createElement('div');
+      div.className = 'player-row';
+      div.innerHTML = `<input type="text" class="form-control aname" placeholder="Nombre del jugador" value="${escHtml(assist.name)}" />
+        <input type="number" class="form-control num-input acount" min="0" value="${assist.count}" placeholder="Asist." />
+        <button type="button" class="btn-rm" onclick="rmRow(this)"><i class="fas fa-xmark"></i></button>`;
+      assistsRows.appendChild(div);
+    });
+  } else {
+    assistsRows.innerHTML = emptyRowHTML('assist');
+  }
 }
 
 /* ================================================================
@@ -2347,18 +2392,19 @@ document.getElementById('matchForm').addEventListener('submit', function(e) {
   const res = getResultadoMacabi(rival);
   if (!res) { showToast('Este partido no tiene resultado en LIDE todavia.', 'err'); return; }
 
-  const existing = buscarPartidoPorRival(rival);
-  if (existing) {
-    if (!confirm('Ya hay goleadores cargados para este partido. Queres reemplazarlos?')) return;
-    matches = matches.filter(m => m.id !== existing.id);
-  }
-
   const scorers = [];
   document.querySelectorAll('#scorersRows .player-row').forEach(row => {
     const name  = row.querySelector('.sname').value.trim();
     const goals = parseInt(row.querySelector('.sgoals').value) || 0;
     if (name) scorers.push({ name, goals });
   });
+
+  // Validar que la suma de goles no supere los goles realizados
+  const totalGoals = scorers.reduce((sum, scorer) => sum + scorer.goals, 0);
+  if (totalGoals > res.goalsFor) {
+    showToast(`La suma de goles (${totalGoals}) no puede superar los goles realizados (${res.goalsFor}).`, 'err');
+    return;
+  }
 
   const assists = [];
   document.querySelectorAll('#assistsRows .player-row').forEach(row => {
@@ -2367,8 +2413,11 @@ document.getElementById('matchForm').addEventListener('submit', function(e) {
     if (name) assists.push({ name, count });
   });
 
+  const existing = buscarPartidoPorRival(rival);
+  const matchId = existing ? existing.id : Date.now().toString();
+
   const match = {
-    id: Date.now().toString(),
+    id: matchId,
     rival,
     date: todayStr(),
     result: res.result,
@@ -2379,7 +2428,19 @@ document.getElementById('matchForm').addEventListener('submit', function(e) {
     scorers, assists,
   };
 
-  matches.unshift(match);
+  if (existing) {
+    // Actualizar partido existente
+    const idx = matches.findIndex(m => m.id === existing.id);
+    if (idx >= 0) {
+      matches[idx] = match;
+      showToast('Goleadores actualizados correctamente', 'ok');
+    }
+  } else {
+    // Agregar nuevo partido
+    matches.unshift(match);
+    showToast('Goleadores guardados correctamente', 'ok');
+  }
+
   saveData(matches);
   supabaseSaveMatch(match).then(ok => {
     if (ok) console.log('[Supabase] Partido guardado en la nube');
@@ -2391,8 +2452,6 @@ document.getElementById('matchForm').addEventListener('submit', function(e) {
   document.getElementById('scorersRows').innerHTML = emptyRowHTML('scorer');
   document.getElementById('assistsRows').innerHTML = emptyRowHTML('assist');
   populateRivalSelect();
-
-  showToast('Goleadores guardados correctamente', 'ok');
 });
 
 /* ================================================================
